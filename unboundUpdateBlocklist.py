@@ -52,7 +52,7 @@ def makeUnboundConfig(fqdns):
 
 def saveUnboundConfig(config, name):
     try:
-        p = "/etc/unbound/unbound.conf.d/999-%s.conf" % name
+        p = "/etc/unbound/unbound.conf.d/800-%s.conf" % name
         with open(p,"w") as fh:
             fh.write(config)
         return True
