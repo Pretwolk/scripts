@@ -40,6 +40,7 @@ def getURL(url):
     if r.status_code != 200:
         return False, r.text
 
+    dump = False
     if dump:
         with open("/tmp/%s" % url['name'],'w') as fh:
             fh.write(r.text)
