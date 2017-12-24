@@ -13,6 +13,14 @@ urls = [
 {"name":"ad_servers", "url": "https://hosts-file.net/ad_servers.txt"}
 ]
 
+def readWhitelist():
+    try:
+        with open('/usr/local/src/dns-resolver/whitelist') as fh:
+            whitelist = fh.readlines()
+        return whitelist
+    except:
+        return []
+
 def searchIP(string):
     pattern = "(([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])\.){3}([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])"
     ip = re.match(pattern,string)
@@ -28,20 +36,25 @@ def searchFQDN(string, where="end"):
     return None
 
 def getURL(url):
-    r = requests.get(url)
+    r = requests.get(url['url'])
     if r.status_code != 200:
         return False, r.text
+
+    if dump:
+        with open("/tmp/%s" % url['name'],'w') as fh:
+            fh.write(r.text)
     return True,r.text
 
 def normalizeIntel(string, fqdns = [], ips = []):
+    whitelist = readWhitelist()
     for i in string.split("\n"):
         i = i.strip()
         if not re.match("^$",i) and not re.match("^#",i):
             ip = searchIP(i)
-            if ip not in ips and ip:
+            if ip not in ips and ip and ip not in whitelist:
                 ips.append(ip)
             fqdn = searchFQDN(i)
-            if fqdn not in fqdns and fqdn:
+            if fqdn not in fqdns and fqdn and fqdn not in whitelist:
                 fqdns.append(fqdn)
     return ips,fqdns
 
@@ -69,7 +82,7 @@ def restartUnbound():
 
 def main(fqdns = [], ips = [], combos = [], unblocklist = []):
     for url in urls:
-        intel_unstruct = getURL(url['url'])
+        intel_unstruct = getURL(url)
         if intel_unstruct[0]:
             ipaddresses,domains = normalizeIntel(intel_unstruct[1])
             if domains:
