@@ -13,10 +13,14 @@ urls = [
 {"name":"ad_servers", "url": "https://hosts-file.net/ad_servers.txt"}
 ]
 
+def log(msg):
+    print("%s" % (msg))
+
 def readWhitelist():
     try:
         with open('/usr/local/src/dns-resolver/whitelist') as fh:
-            whitelist = fh.readlines()
+            whitelist = fh.read().splitlines()
+            log("Loading whitelist: %s items" % len(whitelist))
         return whitelist
     except:
         return []
@@ -52,11 +56,17 @@ def normalizeIntel(string, fqdns = [], ips = []):
         i = i.strip()
         if not re.match("^$",i) and not re.match("^#",i):
             ip = searchIP(i)
-            if ip not in ips and ip and ip not in whitelist:
-                ips.append(ip)
+            if ip not in ips and ip and ip:
+                if ip not in whitelist:
+                    ips.append(ip)
+                else:
+                    log("Not adding %s - found in whitelist" % fqdn)
             fqdn = searchFQDN(i)
-            if fqdn not in fqdns and fqdn and fqdn not in whitelist:
-                fqdns.append(fqdn)
+            if fqdn not in fqdns and fqdn:
+                if fqdn not in whitelist:
+                    fqdns.append(fqdn)
+                else:
+                    log("Not adding %s - found in whitelist" % fqdn)
     return ips,fqdns
 
 def makeUnboundConfig(fqdns):
@@ -76,23 +86,27 @@ def saveUnboundConfig(config, name):
 def restartUnbound():
     checkconfig = subprocess.run(["/usr/sbin/unbound-checkconf"], stdout=subprocess.PIPE, stderr=subprocess.PIPE) 
     if checkconfig.returncode:
-        print("New unbound config not valid:")
-        print("%s\n%s"%(checkconfig.stdout,checkconfig.stderr))
+        log("New unbound config not valid:")
+        log("%s\n%s"%(checkconfig.stdout,checkconfig.stderr))
         return False
-    subprocess.run(["systemctl","reload","unbound"])
+    return subprocess.run(["systemctl","reload","unbound"])
 
-def main(fqdns = [], ips = [], combos = [], unblocklist = []):
+def main(fqdns = [], ips = []):
     for url in urls:
         intel_unstruct = getURL(url)
         if intel_unstruct[0]:
             ipaddresses,domains = normalizeIntel(intel_unstruct[1])
+            log("Read %s domains from %s" % (len(domains),url['name']))
             if domains:
                 for d in domains:
                     if d not in fqdns:
                         fqdns.append(d)
-            
+    log("Adding %s fqdns to unbound" % len(fqdns)) 
     config = saveUnboundConfig(makeUnboundConfig(fqdns), "blockhosts")
-    restartUnbound()
+    if restartUnbound():
+        log("Unbound succesfully restarted")
+    else:
+        log("Failed restarting unbound")
 
 
 if __name__ == "__main__":
